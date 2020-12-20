@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose --file docker-compose.yml convert
+    kompose.version: 1.21.0 ()
+  labels:
+    io.kompose.service: mystok-app
+  name: mystok-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      io.kompose.service: mystok-app
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: kompose --file docker-compose.yml convert
+        kompose.version: 1.21.0 ()
+      labels:
+        io.kompose.service: mystok-app
+    spec:
+      containers:
+      - image: dekabitasp/mystok-app-github-actions
+        imagePullPolicy: ""
+        name: mystok-app
+        ports:
+        - containerPort: 80
+        resources: 
+          requests:
+            memory: 256Mi
+            cpu: 100m
+          limits:
+            memory: 512Mi
+            cpu: 200m
+        readinessProbe:
+          httpGet:
+            path: /mystok/top.jsp
+            port: 80
+          failureThreshold: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            port: 80
+            path: /mystok/top.jsp
+          failureThreshold: 5
+          periodSeconds: 30
+        volumeMounts:
+        - name: google-cloud-key
+          mountPath: /var/secrets/google
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /var/secrets/google/key.json
+      - image: gcr.io/cloudsql-docker/gce-proxy:1.17
+        name: cloud-sql-proxy
+        command:
+          - "/cloud_sql_proxy"
+          - "-instances=my-kubernetes-test-20200822:us-central1:mystok-cloudsql-2=tcp:3306"
+          - "-credential_file=/secrets/service_account.json"
+        securityContext:
+          runAsNonRoot: true
+        volumeMounts:
+        - name: gcp-sa-mystok-secret-volume
+          mountPath: /secrets/
+          readOnly: true
+        resources:
+          limits:
+            cpu: 100m
+      restartPolicy: Always
+      serviceAccountName: ""
+      volumes:
+      - name: gcp-sa-mystok-secret-volume
+        secret:
+          secretName: gcp-sa-mystok-secret
+      - name: google-cloud-key
+        secret:
+          secretName: mystok-cloud-storage-sa-secret
