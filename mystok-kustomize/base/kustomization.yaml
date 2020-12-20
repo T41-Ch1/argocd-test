@@ -1,0 +1,3 @@
+resources:
+- mystok-app-deployment.yaml
+- mystok-app-service.yaml
